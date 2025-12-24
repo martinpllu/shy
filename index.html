@@ -356,6 +356,10 @@
       border-color: var(--fg-muted);
     }
 
+    .settings-menu-btn:focus {
+      outline: none;
+    }
+
     .settings-menu-btn svg {
       width: 16px;
       height: 16px;
@@ -984,7 +988,46 @@
     async function startRecording() {
       try {
         audioChunks = [];
-        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Check if mediaDevices API is available
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          console.error('mediaDevices API not available');
+          showError('Browser does not support audio recording');
+          return;
+        }
+
+        // Enumerate devices first to check what's available
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioInputs = devices.filter(d => d.kind === 'audioinput');
+          console.log('Available audio inputs:', audioInputs);
+
+          if (audioInputs.length === 0) {
+            showError('No microphone found. Check browser permissions.');
+            setButtonState('ready');
+            return;
+          }
+        } catch (enumError) {
+          console.warn('Could not enumerate devices:', enumError);
+        }
+
+        // Try with explicit constraints - helps with some Brave configurations
+        const constraints = {
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        };
+        audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        // iOS Safari: "unlock" speech synthesis with a silent utterance on user gesture
+        if (window.speechSynthesis && !window.speechUnlocked) {
+          const silentUtterance = new SpeechSynthesisUtterance('');
+          silentUtterance.volume = 0;
+          speechSynthesis.speak(silentUtterance);
+          window.speechUnlocked = true;
+        }
 
         let mimeType = 'audio/webm';
         if (MediaRecorder.isTypeSupported('audio/mp4')) {
@@ -1357,6 +1400,9 @@ Respond naturally as if having a spoken conversation.`;
         return;
       }
 
+      // iOS Safari workaround: cancel any pending speech first
+      speechSynthesis.cancel();
+
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1;
       utterance.pitch = 1;
@@ -1383,9 +1429,28 @@ Respond naturally as if having a spoken conversation.`;
 
       if (voice) utterance.voice = voice;
 
-      utterance.onend = () => processQueue();
-      utterance.onerror = () => processQueue();
+      // iOS Safari fix: onend often doesn't fire, use timeout as fallback
+      let ended = false;
+      const markEnded = () => {
+        if (ended) return;
+        ended = true;
+        processQueue();
+      };
 
+      utterance.onend = markEnded;
+      utterance.onerror = markEnded;
+
+      // Fallback timeout for iOS - estimate ~80ms per character at normal rate
+      const estimatedDuration = Math.max(2000, text.length * 80);
+      setTimeout(() => {
+        if (!ended && isSpeaking) {
+          console.warn('Speech timeout fallback triggered');
+          markEnded();
+        }
+      }, estimatedDuration);
+
+      // iOS Safari: need to resume in case it's paused
+      speechSynthesis.resume();
       speechSynthesis.speak(utterance);
     }
 
