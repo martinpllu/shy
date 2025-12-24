@@ -1617,39 +1617,13 @@ Respond naturally as if having a spoken conversation.`;
         voice = voices.find(v => v.name === selectedVoiceName);
       }
 
+      // Fallback to default voice if selected not found
       if (!voice) {
-        // Prefer on-device voices for privacy (localService: true)
-        // Best quality local voices on macOS/iOS
-        const preferredLocal = [
-          'Samantha (Enhanced)', 'Ava (Premium)', 'Zoe (Premium)', 'Tom (Enhanced)',
-          'Serena (Premium)', 'Daniel (Enhanced)', 'Karen (Enhanced)', 'Alex',
-          'Samantha', 'Daniel', 'Karen', 'Moira', 'Tessa'
-        ];
-
-        // Try local voices first
-        for (const name of preferredLocal) {
-          voice = voices.find(v => v.name.includes(name) && v.localService !== false);
-          if (voice) break;
-        }
-
-        // Fallback to any English local voice
-        if (!voice) {
-          voice = voices.find(v => v.lang.startsWith('en') && v.localService !== false);
-        }
-
-        // Last resort: any English voice (including cloud)
-        if (!voice) {
-          voice = voices.find(v => v.lang.startsWith('en'));
-        }
+        voice = getDefaultVoice(voices);
       }
 
       if (voice) {
         utterance.voice = voice;
-        // Save the auto-selected voice so it shows as selected in UI
-        if (!selectedVoiceName) {
-          selectedVoiceName = voice.name;
-          localStorage.setItem('selectedVoice', voice.name);
-        }
       }
 
       // iOS Safari fix: onend often doesn't fire, use timeout as fallback
@@ -1724,18 +1698,27 @@ Respond naturally as if having a spoken conversation.`;
       return voices.find(v => v.lang.startsWith('en'));
     }
 
+    // Initialize default voice at startup
+    function initDefaultVoice() {
+      if (selectedVoiceName) return; // Already have a selection
+
+      const voices = speechSynthesis.getVoices();
+      const englishVoices = voices.filter(v => v.lang.startsWith('en'));
+      if (englishVoices.length === 0) return;
+
+      const defaultVoice = getDefaultVoice(englishVoices);
+      if (defaultVoice) {
+        selectedVoiceName = defaultVoice.name;
+        localStorage.setItem('selectedVoice', defaultVoice.name);
+      }
+    }
+
     function populateVoiceList() {
       const voices = speechSynthesis.getVoices();
       let englishVoices = voices.filter(v => v.lang.startsWith('en'));
 
-      // If no voice selected yet, determine and save the default
-      if (!selectedVoiceName && englishVoices.length > 0) {
-        const defaultVoice = getDefaultVoice(englishVoices);
-        if (defaultVoice) {
-          selectedVoiceName = defaultVoice.name;
-          localStorage.setItem('selectedVoice', defaultVoice.name);
-        }
-      }
+      // Ensure we have a default voice selected
+      initDefaultVoice();
 
       // Filter out cloud voices if toggle is off
       if (!cloudVoicesEnabled) {
@@ -1940,10 +1923,15 @@ Respond naturally as if having a spoken conversation.`;
         populateVoiceList();
       });
 
-      // Load voices
+      // Load voices and init default at startup
       if (speechSynthesis.onvoiceschanged !== undefined) {
-        speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
+        speechSynthesis.onvoiceschanged = () => {
+          speechSynthesis.getVoices();
+          initDefaultVoice();
+        };
       }
+      // Also try immediately in case voices are already loaded
+      initDefaultVoice();
     }
 
     // ============ Start ============
