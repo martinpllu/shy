@@ -1,17 +1,17 @@
 # Shy
 
-**A private, simple, self-hostable voice interface for AI.**
+**A private, simple, self-hostable interface for AI.**
 
-Voice chats with AI require subscriptions, and every word is recorded by an AI lab. Shy gives you a voice conversation that leaves no trace—no transcripts, no history, nothing stored.
+Chats with AI require subscriptions, and every word is recorded by an AI lab. Shy gives you conversations that leave no trace—no transcripts, no history, nothing stored.
 
 *Requires an OpenRouter account. Pay-as-you-go with low cost and privacy guarantees.*
 
 ## Features
 
 - **Private** - Zero Data Retention at every layer. No conversation history, no transcripts.
+- **Voice or text** - Talk or type, with streaming responses and markdown formatting.
 - **Simple and self-hostable** - One HTML file. Host it yourself or use it [here](https://martinpllu.github.io/shy/)
 - **No subscription** - Pay only for what you use via OpenRouter (fractions of a cent per conversation).
-- **Voice only** - Just you and the AI, talking.
 - **Works everywhere** - Desktop and mobile, any modern browser.
 
 ## Privacy
@@ -28,7 +28,7 @@ No conversation history, no transcripts, no record of what you said.
 
 ## How it Works
 
-Your voice is recorded in the browser, sent to the AI model via OpenRouter, and the response is spoken back using your device's text-to-speech. That's it.
+In voice mode, your voice is recorded in the browser, sent to the AI model via OpenRouter, and the response is spoken back using your device's text-to-speech. In text mode, you type your message and responses stream back with markdown formatting. That's it.
 
 ## Voice Quality
 
@@ -51,7 +51,7 @@ The app uses Gemini Flash 3 which works well at very low cost. Conversations typ
 2. **Add credits** - $5 is plenty to start (Settings → Credits)
 3. **Open Shy** at https://martinpllu.github.io/shy
 4. **Connect** with your OpenRouter account
-5. **Tap the button** or press Space to talk
+5. **Tap the button** or press Space to talk, or switch to text mode to type
 
 ## Self-Hosting
 
