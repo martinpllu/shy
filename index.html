@@ -1947,6 +1947,10 @@
         userEl.className = 'message user';
         userEl.textContent = content;
         group.appendChild(userEl);
+
+        // Scroll user message to top of visible area
+        group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
       } else {
         // Assistant message goes in the last group
         if (!group) {
@@ -1971,8 +1975,6 @@
           currentStreamingElement = null;
         }
       }
-
-      scrollToBottom();
     }
 
     function updateStreamingMessage(content) {
