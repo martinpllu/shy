@@ -1934,21 +1934,14 @@
     }
 
     function addMessageToHistory(role, content, streaming = false) {
-      // Find or create the last message group
+      // Find the last message group (skip spacer if present)
       let group = conversationHistoryEl.lastElementChild;
+      if (group && group.classList.contains('scroll-spacer')) {
+        group = group.previousElementSibling;
+      }
 
       if (role === 'user') {
-        // Always create a new group for user messages
-        group = document.createElement('div');
-        group.className = 'message-group';
-        conversationHistoryEl.appendChild(group);
-
-        const userEl = document.createElement('div');
-        userEl.className = 'message user';
-        userEl.textContent = content;
-        group.appendChild(userEl);
-
-        // Add spacer to allow scrolling message to top
+        // Ensure spacer exists at the end
         let spacer = conversationHistoryEl.querySelector('.scroll-spacer');
         if (!spacer) {
           spacer = document.createElement('div');
@@ -1957,6 +1950,16 @@
         }
         // Spacer height = viewport height so we can scroll the last item to top
         spacer.style.height = conversationHistoryEl.clientHeight + 'px';
+
+        // Create new group for user message, insert before spacer
+        group = document.createElement('div');
+        group.className = 'message-group';
+        conversationHistoryEl.insertBefore(group, spacer);
+
+        const userEl = document.createElement('div');
+        userEl.className = 'message user';
+        userEl.textContent = content;
+        group.appendChild(userEl);
 
         // Scroll so user message appears at top of visible area
         requestAnimationFrame(() => {
