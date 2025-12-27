@@ -1949,8 +1949,9 @@
         group.appendChild(userEl);
 
         // Scroll so user message appears at top of visible area
+        // offsetTop is relative to container, subtract padding (5rem = 80px)
         conversationHistoryEl.scrollTo({
-          top: group.offsetTop - 20,
+          top: group.offsetTop - 80,
           behavior: 'smooth'
         });
         return;
