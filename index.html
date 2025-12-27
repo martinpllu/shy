@@ -1980,7 +1980,6 @@
     function updateStreamingMessage(content) {
       if (currentStreamingElement) {
         currentStreamingElement.innerHTML = parseMarkdown(content);
-        scrollToBottom();
       }
     }
 
@@ -1988,7 +1987,6 @@
       if (currentStreamingElement) {
         currentStreamingElement.classList.remove('streaming');
         currentStreamingElement = null;
-        scrollToBottom();
       }
     }
 
