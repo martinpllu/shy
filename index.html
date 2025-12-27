@@ -1883,6 +1883,7 @@
         voiceModeBtn.classList.remove('active');
         textModeBtn.classList.add('active');
         renderConversationHistory();
+        textInput.focus();
       } else {
         voiceScreen.classList.remove('text-mode');
         textInputContainer.classList.remove('visible');
@@ -1896,9 +1897,6 @@
       textMode = enabled;
       localStorage.setItem('textMode', enabled);
       updateModeUI();
-      if (enabled) {
-        textInput.focus();
-      }
     }
 
     function renderConversationHistory() {
