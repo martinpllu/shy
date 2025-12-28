@@ -1548,6 +1548,7 @@
     let shouldStopSpeaking = false;
     let textMode = localStorage.getItem('textMode') === 'true';
     let isProcessingText = false;
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     let currentStreamingElement = null;
 
     // Stats
@@ -2026,7 +2027,10 @@
         voiceModeBtn.classList.remove('active');
         textModeBtn.classList.add('active');
         renderConversationHistory();
-        textInput.focus();
+        // Only auto-focus on desktop to avoid keyboard popping up on mobile
+        if (!isMobile) {
+          textInput.focus();
+        }
       } else {
         voiceScreen.classList.remove('text-mode');
         textInputContainer.classList.remove('visible');
@@ -2636,7 +2640,7 @@ Be concise and direct in your responses. Focus on being helpful and informative.
         textSendBtn.classList.remove('loading');
         textInput.disabled = false;
         // Only auto-focus on desktop to avoid keyboard popping up on mobile
-        if (window.innerWidth > 600) {
+        if (!isMobile) {
           textInput.focus();
         }
         stopBtn.classList.add('hidden');
