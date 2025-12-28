@@ -1425,6 +1425,47 @@
     </div>
   </div>
 
+  <!-- About Modal -->
+  <div class="modal-overlay hidden" id="aboutModal">
+    <div class="modal modal-small">
+      <div class="modal-header">
+        <h3>About</h3>
+        <button class="modal-close" id="aboutModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 1rem;">Simple, private AI chat.</p>
+        <p style="margin-bottom: 1rem;">
+          <a href="https://github.com/martinpllu/spraff" target="_blank" style="color: var(--link); text-decoration: none; font-weight: 600;">GitHub</a>
+        </p>
+        <p style="color: var(--fg-muted);">
+          Created by <a href="https://www.linkedin.com/in/martin-pllu-7034513" target="_blank" style="color: var(--link); text-decoration: none;">Martin Pllu</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Privacy Modal -->
+  <div class="modal-overlay hidden" id="privacyModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Privacy Policy</h3>
+        <button class="modal-close" id="privacyModalClose">&times;</button>
+      </div>
+      <div class="modal-body" style="line-height: 1.7;">
+        <p style="margin-bottom: 1rem;"><strong>Spraff stores nothing.</strong></p>
+        <p style="margin-bottom: 1rem;">This app has no backend. It's a static HTML file that runs entirely in your browser. Your conversations are not stored, logged, or transmitted anywhere except to the AI model provider.</p>
+        <p style="margin-bottom: 1rem;"><strong>How your data flows:</strong></p>
+        <ul style="margin-bottom: 1rem; padding-left: 1.5rem;">
+          <li style="margin-bottom: 0.5rem;"><strong>This app</strong> — No data collection. No analytics. No cookies (except your OpenRouter API key in localStorage).</li>
+          <li style="margin-bottom: 0.5rem;"><strong>OpenRouter</strong> — Routes your request to the AI model. With Zero Data Retention models, no conversation content is stored—only metadata (timestamps, token counts).</li>
+          <li style="margin-bottom: 0.5rem;"><strong>Google Vertex (Gemini)</strong> — Processes your request with Zero Data Retention enabled. Prompts and responses are not stored or used for training.</li>
+        </ul>
+        <p style="margin-bottom: 1rem;">When you close the browser tab, your conversation is gone. There's no history, no transcripts, no way to recover what was said.</p>
+        <p style="color: var(--fg-muted);">Your OpenRouter API key is stored in your browser's localStorage so you don't have to log in every time. You can clear it by logging out.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- Voice Settings Modal -->
   <div class="modal-overlay hidden" id="voiceModal">
     <div class="modal">
@@ -1448,19 +1489,14 @@
           </label>
         </div>
         <div class="voice-help" id="voiceHelp">
-          <button class="voice-help-btn" id="voiceHelpBtn">
+          <a class="voice-help-btn" href="https://github.com/martinpllu/spraff#voice-quality" target="_blank">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" fill="none">
               <circle cx="12" cy="12" r="10"/>
               <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
               <line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
             How to install better voices
-          </button>
-          <div class="voice-help-content hidden" id="voiceHelpContent">
-            <p><strong>macOS:</strong> System Settings → Accessibility → Spoken Content → System Voice → Manage Voices</p>
-            <p><strong>iOS:</strong> Settings → Accessibility → Spoken Content → Voices → English</p>
-            <p>Download voices marked "Premium" or "Enhanced" for best quality.</p>
-          </div>
+          </a>
         </div>
         <div class="voice-list" id="voiceList"></div>
       </div>
@@ -1567,6 +1603,20 @@
           Copy chat
         </button>
         <div class="divider"></div>
+        <button id="aboutBtn">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          About
+        </button>
+        <button id="privacyBtn">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          Privacy
+        </button>
         <button id="logoutBtn">
           <svg viewBox="0 0 24 24">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -1675,6 +1725,12 @@
     const costBalance = document.getElementById('costBalance');
     const costLast = document.getElementById('costLast');
     const costSession = document.getElementById('costSession');
+    const aboutModal = document.getElementById('aboutModal');
+    const aboutModalClose = document.getElementById('aboutModalClose');
+    const aboutBtn = document.getElementById('aboutBtn');
+    const privacyModal = document.getElementById('privacyModal');
+    const privacyModalClose = document.getElementById('privacyModalClose');
+    const privacyBtn = document.getElementById('privacyBtn');
     const errorToast = document.getElementById('errorToast');
     const textInputContainer = document.getElementById('textInputContainer');
     const textInput = document.getElementById('textInput');
@@ -3177,6 +3233,30 @@ Be concise and direct in your responses. Focus on being helpful and informative.
         if (e.target === costModal) closeCostModal();
       });
 
+      // About modal
+      aboutBtn.addEventListener('click', () => {
+        settingsDropdown.classList.remove('open');
+        aboutModal.classList.remove('hidden');
+      });
+      aboutModalClose.addEventListener('click', () => {
+        aboutModal.classList.add('hidden');
+      });
+      aboutModal.addEventListener('click', (e) => {
+        if (e.target === aboutModal) aboutModal.classList.add('hidden');
+      });
+
+      // Privacy modal
+      privacyBtn.addEventListener('click', () => {
+        settingsDropdown.classList.remove('open');
+        privacyModal.classList.remove('hidden');
+      });
+      privacyModalClose.addEventListener('click', () => {
+        privacyModal.classList.add('hidden');
+      });
+      privacyModal.addEventListener('click', (e) => {
+        if (e.target === privacyModal) privacyModal.classList.add('hidden');
+      });
+
       // Search toggle
       searchToggle.addEventListener('click', () => {
         webSearchEnabled = !webSearchEnabled;
@@ -3191,11 +3271,6 @@ Be concise and direct in your responses. Focus on being helpful and informative.
       modalClose.addEventListener('click', closeVoiceSettings);
       voiceModal.addEventListener('click', (e) => {
         if (e.target === voiceModal) closeVoiceSettings();
-      });
-
-      // Voice help toggle
-      document.getElementById('voiceHelpBtn').addEventListener('click', () => {
-        document.getElementById('voiceHelpContent').classList.toggle('hidden');
       });
 
       // Cloud voices toggle
