@@ -2803,8 +2803,28 @@ Be concise and direct in your responses. Focus on being helpful and informative.
     const recommendedVoices = [
       'Samantha (Enhanced)', 'Ava (Premium)', 'Zoe (Premium)', 'Tom (Enhanced)',
       'Serena (Premium)', 'Daniel (Enhanced)', 'Karen (Enhanced)',
-      'Google UK English Female', 'Google UK English Male', 'Google US English'
+      'Google UK English Female', 'Google UK English Male', 'Google US English',
+      // Windows natural voices
+      'Microsoft Jenny', 'Microsoft Aria', 'Microsoft Guy'
     ];
+
+    // Low quality, novelty, or problematic voices to filter out
+    const voiceBlacklist = [
+      // Apple Novelty/Effects voices
+      'Albert', 'Bad News', 'Bahh', 'Bells', 'Boing', 'Bubbles', 'Cellos',
+      'Deranged', 'Fred', 'Good News', 'Hysterical', 'Jester', 'Junior',
+      'Kathy', 'Organ', 'Superstar', 'Trinoids', 'Whisper', 'Wobble',
+      'Zarvox', 'Ralph', 'Agnes', 'Bruce', 'Vicki', 'Victoria', 'Princess',
+      // Apple Eloquence voices (robotic)
+      'Eddy', 'Flo', 'Grandma', 'Grandpa', 'Reed', 'Rocko', 'Sandy', 'Shelley',
+      // eSpeak voices
+      'eSpeak', 'espeak'
+    ];
+
+    function isBlacklisted(voice) {
+      const name = voice.name;
+      return voiceBlacklist.some(blocked => name.includes(blocked));
+    }
 
     function isRecommended(voice) {
       return recommendedVoices.some(name => voice.name.includes(name));
@@ -2848,7 +2868,24 @@ Be concise and direct in your responses. Focus on being helpful and informative.
 
     function populateVoiceList() {
       const voices = speechSynthesis.getVoices();
+
+      // If voices aren't loaded yet, wait for them
+      if (voices.length === 0) {
+        return;
+      }
+
       let englishVoices = voices.filter(v => v.lang.startsWith('en'));
+
+      // Filter out blacklisted low-quality/novelty voices
+      englishVoices = englishVoices.filter(v => !isBlacklisted(v));
+
+      // Deduplicate voices with the same name (macOS returns duplicates at different quality levels)
+      const seenNames = new Set();
+      englishVoices = englishVoices.filter(v => {
+        if (seenNames.has(v.name)) return false;
+        seenNames.add(v.name);
+        return true;
+      });
 
       // Ensure we have a default voice selected
       initDefaultVoice();
@@ -2952,8 +2989,21 @@ Be concise and direct in your responses. Focus on being helpful and informative.
     }
 
     function openVoiceSettings() {
-      populateVoiceList();
       voiceModal.classList.remove('hidden');
+
+      // Try to populate immediately
+      populateVoiceList();
+
+      // If voices weren't ready, wait for them
+      const voices = speechSynthesis.getVoices();
+      if (voices.length === 0) {
+        // Set up a one-time handler to populate when voices load
+        const onVoicesReady = () => {
+          populateVoiceList();
+          speechSynthesis.removeEventListener('voiceschanged', onVoicesReady);
+        };
+        speechSynthesis.addEventListener('voiceschanged', onVoicesReady);
+      }
     }
 
     function closeVoiceSettings() {
@@ -3071,8 +3121,11 @@ Be concise and direct in your responses. Focus on being helpful and informative.
       // Load voices and init default at startup
       if (speechSynthesis.onvoiceschanged !== undefined) {
         speechSynthesis.onvoiceschanged = () => {
-          speechSynthesis.getVoices();
           initDefaultVoice();
+          // Update voice list if modal is open
+          if (!voiceModal.classList.contains('hidden')) {
+            populateVoiceList();
+          }
         };
       }
       // Also try immediately in case voices are already loaded
