@@ -4,6 +4,8 @@
 
 No backend, no subscription, no data stored. Host it yourself or use it [here](https://martinpllu.github.io/spraff/).
 
+*Uses [OpenRouter](https://openrouter.ai) for private, pay-per-use AI access.*
+
 ## Features
 
 - **Private** - Zero Data Retention everywhere. Nothing saved, ever.
@@ -11,6 +13,10 @@ No backend, no subscription, no data stored. Host it yourself or use it [here](h
 - **Self-hostable** - It's one HTML file. Host it yourself or use it [here](https://martinpllu.github.io/spraff/)
 - **No subscription** - Pay per conversation via OpenRouter (fractions of a cent each).
 - **Works everywhere** - Desktop, mobile, any modern browser.
+
+<p align="center">
+  <img src="docs/spraff-1.png" height="350" alt="Spraff voice mode" />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="docs/spraff-2.png" height="350" alt="Spraff text mode" />
+</p>
 
 ## Privacy
 
