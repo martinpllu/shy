@@ -211,6 +211,18 @@
       z-index: 40;
     }
 
+    .voice-screen.text-mode::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 100px;
+      background: linear-gradient(to top, transparent, var(--bg) 70%);
+      pointer-events: none;
+      z-index: 40;
+    }
+
     /* The Button - Central Control */
     .button-container {
       position: relative;
