@@ -46,9 +46,18 @@ Default system voices can sound a bit robotic, but you can download better ones 
 
 Look for **Premium** or **Enhanced** voices - they're high-quality neural voices that run locally.
 
+## Models
+
+Spraff uses **Gemini 3 Flash** via Google Vertex. Why this specific model?
+
+- **Audio input + Zero Data Retention**: Very few models support both. OpenAI's GPT-4o Audio handles audio but doesn't offer ZDR. Gemini via Vertex is currently the only option that does both.
+- **Flash over Pro**: Gemini 3 Pro also supports audio + ZDR, but Flash actually beats Pro in most benchmarks while being significantly cheaper and faster.
+
+If other models add audio support with ZDR in the future, Spraff may offer model selection.
+
 ## Cost
 
-Spraff uses Gemini Flash 3, which is fast and cheap. Most conversations cost a fraction of a cent (though requests with web search cost a couple of cents each). A few dollars of OpenRouter credit goes a long way.
+Most conversations cost a fraction of a cent (though requests with web search cost a couple of cents each). A few dollars of OpenRouter credit goes a long way.
 
 ## Getting Started
 
