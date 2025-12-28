@@ -449,11 +449,11 @@
       color: var(--secondary);
     }
 
-    /* New chat button - top left */
+    /* New chat button - top left, aligned with content */
     .new-chat-btn {
       position: fixed;
       top: 1.5rem;
-      left: 1.5rem;
+      left: max(1.5rem, calc(50% - 360px));
       width: 44px;
       height: 44px;
       border-radius: 14px;
@@ -490,11 +490,11 @@
       display: none;
     }
 
-    /* Settings menu - top right */
+    /* Settings menu - top right, aligned with content */
     .settings-menu {
       position: fixed;
       top: 1.5rem;
-      right: 1.5rem;
+      right: max(1.5rem, calc(50% - 360px));
       z-index: 100;
     }
 
