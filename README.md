@@ -2,7 +2,9 @@
 
 **A private, simple, self-hostable interface for AI.**
 
-Chats with AI require subscriptions, and every word is recorded by an AI lab. Shy gives you conversations that leave no trace. No transcripts, no history, nothing stored.
+Most AI chat interfaces require subscriptions, and your data is stored by AI labs or intermediaries. 
+
+Shy gives you conversations that leave no trace. No transcripts, no history, nothing stored.
 
 *Requires an OpenRouter account. Pay-as-you-go with low cost and privacy guarantees.*
 
@@ -22,9 +24,11 @@ The app has no backend - it's a static HTML file. Your conversations go through 
 
 - **This app**: No backend, no data collection
 - **OpenRouter**: No conversation content stored, only metadata (timestamps, usage)
-- **Google Vertex**: Zero Data Retention—your prompts and responses are not stored or logged
+- **Google Vertex**: Zero Data Retention - your prompts and responses are not stored or logged
 
 No conversation history, no transcripts, no record of what you said.
+
+*Other models supporting zero data retention can be added if there is interest.*
 
 ## How it Works
 
@@ -44,8 +48,6 @@ Look for voices marked **Premium** or **Enhanced**. These are high-quality neura
 ## Cost
 
 The app uses Gemini Flash 3 which works well at very low cost. Conversations typically cost a fraction of a cent, or a couple of cents with web search enabled. A few dollars of OpenRouter credit will usually last a long time.
-
-Other models supporting zero data retention can be added if there is interest.
 
 ## Getting Started
 

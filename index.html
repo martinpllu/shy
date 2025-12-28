@@ -927,10 +927,11 @@
     }
 
     .message.user {
-      color: var(--fg-muted);
-      font-style: italic;
-      padding-left: 1rem;
-      border-left: 2px solid var(--border);
+      color: var(--fg);
+      background: var(--surface);
+      padding: 1rem 1.25rem;
+      border-radius: 1rem;
+      border: 1px solid var(--border);
     }
 
     .message.assistant {
@@ -1155,6 +1156,43 @@
 
     .text-send-btn.loading .spinner-icon {
       display: block;
+    }
+
+    /* Scroll Down Button */
+    .scroll-down-btn {
+      position: fixed;
+      bottom: 10rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 45;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(45, 42, 36, 0.1);
+    }
+
+    .scroll-down-btn.visible {
+      display: flex;
+    }
+
+    .scroll-down-btn:hover {
+      border-color: var(--fg-muted);
+      box-shadow: 0 4px 12px rgba(45, 42, 36, 0.15);
+    }
+
+    .scroll-down-btn svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--fg-muted);
+      stroke-width: 2;
+      fill: none;
     }
 
     /* Mode Toggle */
@@ -1382,6 +1420,13 @@
       </div>
     </div>
 
+    <!-- Scroll Down Button -->
+    <button class="scroll-down-btn" id="scrollDownBtn">
+      <svg viewBox="0 0 24 24">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </button>
+
     <!-- The Button -->
     <div class="button-container">
       <button class="main-button" id="mainButton">
@@ -1551,6 +1596,7 @@
     const textModeBtn = document.getElementById('textModeBtn');
     const conversationHistoryEl = document.getElementById('conversationHistory');
     const newChatBtn = document.getElementById('newChatBtn');
+    const scrollDownBtn = document.getElementById('scrollDownBtn');
 
     // ============ Initialization ============
     function init() {
@@ -2982,6 +3028,19 @@ Be concise and direct in your responses. Focus on being helpful and informative.
         window.visualViewport.addEventListener('resize', adjustForKeyboard);
         window.visualViewport.addEventListener('scroll', adjustForKeyboard);
       }
+
+      // Scroll down button - show when not at bottom
+      conversationHistoryEl.addEventListener('scroll', () => {
+        const isNearBottom = conversationHistoryEl.scrollHeight - conversationHistoryEl.scrollTop - conversationHistoryEl.clientHeight < 100;
+        scrollDownBtn.classList.toggle('visible', !isNearBottom && textMode);
+      });
+
+      scrollDownBtn.addEventListener('click', () => {
+        conversationHistoryEl.scrollTo({
+          top: conversationHistoryEl.scrollHeight,
+          behavior: 'smooth'
+        });
+      });
     }
 
     // ============ Start ============
