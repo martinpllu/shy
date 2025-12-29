@@ -185,6 +185,21 @@
       transform: translateY(0) scale(0.98);
     }
 
+    .login-about {
+      margin-top: 1.5rem;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      color: var(--fg-muted);
+      text-decoration: underline;
+      transition: color 0.2s ease;
+      opacity: 0;
+      animation: btnAppear 0.5s ease-out 0.5s forwards;
+    }
+
+    .login-about:hover {
+      color: var(--accent);
+    }
+
     /* Main Voice Screen */
     .voice-screen {
       position: fixed;
@@ -1366,7 +1381,7 @@
       border: none;
       background: transparent;
       border-radius: 10px;
-      cursor: pointer;
+      pointer-events: none;
       transition: all 0.2s ease;
     }
 
@@ -1595,8 +1610,9 @@
         <text x="110" y="54" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-size="42" font-weight="800" fill="white">spraff</text>
       </svg>
     </div>
-    <p class="login-tagline">Private voice chat with AI</p>
+    <p class="login-tagline">Simple AI chat</p>
     <button class="login-btn" id="loginBtn">Get started</button>
+    <a class="login-about" href="https://github.com/martinpllu/spraff" target="_blank">About</a>
   </div>
 
   <!-- Main Voice Screen -->
