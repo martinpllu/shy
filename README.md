@@ -1,34 +1,38 @@
 # Spraff
 
-**Simple, private AI chat**
+**Simple, self-hostable AI chat. Voice and text.**
 
-No subscription, no data stored. Host it yourself or use it [here](https://martinpllu.github.io/spraff/).
+Requires an OpenRouter account for pay-as-you-go model access. A few dollars go a long way with most conversations being a fraction of a cent.
 
-*Uses [OpenRouter](https://openrouter.ai) for private, pay-per-use AI access.*
+Uses Gemini 3 Flash configured with Zero Data Retention. No chat data is stored at any layer.
 
-## Features
+Host it yourself or use it here: [https://martinpllu.github.io/spraff](https://martinpllu.github.io/spraff)
 
-- **Private** - Zero Data Retention everywhere. Nothing saved, ever.
-- **Voice or text** - Speak and listen or type and read.
-- **Self-hostable** - Single HTML file. Host it yourself or use it [here](https://martinpllu.github.io/spraff/)
-- **No subscription** - Pay per conversation via OpenRouter (fractions of a cent each).
-- **Works everywhere** - Desktop, mobile, any modern browser.
 
 <p align="center">
   <img src="docs/spraff-1.png" height="525" alt="Spraff voice mode" />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="docs/spraff-2.png" height="525" alt="Spraff text mode" />
 </p>
 
+## Getting Started
+
+1. **Create an OpenRouter account** at [openrouter.ai](https://openrouter.ai)
+2. **Add credits** - $5 is plenty to start
+3. **Open Spraff** at https://martinpllu.github.io/spraff
+4. **Log in** click 'Get Started' and log into to your OpenRouter account
+5. **Chat** with the AI via voice or text mode
+6. **Add to Home Screen** - recommended on mobile for easy access
+
 ## Privacy
 
-ChatGPT, Claude and Gemini store every conversation against your account. Spraff doesn't.
-
-There's no backend - it's just a static HTML file. Your conversations go through [OpenRouter](https://openrouter.ai) to Gemini Flash 3 on Google Vertex with **Zero Data Retention** enabled:
+There's no backend - it's just a static HTML file. Your conversations go through [OpenRouter](https://openrouter.ai) to Gemini 3 Flash on Google Vertex with [Zero Data Retention](https://openrouter.ai/docs/guides/features/zdr) enabled:
 
 - **This app**: No backend, no data collection
 - **OpenRouter**: No conversation content stored, just metadata (timestamps, usage)
 - **Google Vertex**: Zero Data Retention - prompts and responses aren't stored or logged
 
-No history, no transcripts, no record of what you said.
+## Cost
+
+Most conversations cost a fraction of a cent, though requests with web search cost a couple of cents each. 
 
 ## Voice Quality
 
@@ -54,18 +58,6 @@ Spraff uses **Gemini 3 Flash** via Google Vertex. Why this specific model?
 - **Flash over Pro**: Gemini 3 Pro also supports audio + ZDR, but Flash actually beats Pro in most benchmarks while being significantly cheaper and faster.
 
 If other models add audio support with ZDR in the future, Spraff may offer model selection.
-
-## Cost
-
-Most conversations cost a fraction of a cent (though requests with web search cost a couple of cents each). A few dollars of OpenRouter credit goes a long way.
-
-## Getting Started
-
-1. **Create an OpenRouter account** at [openrouter.ai](https://openrouter.ai)
-2. **Add credits** - $5 is plenty to start
-3. **Open Spraff** at https://martinpllu.github.io/spraff
-4. **Connect** your OpenRouter account
-5. **Tap the button** or press Space to talk, or switch to text mode
 
 ## Self-Hosting
 
