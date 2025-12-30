@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="screen-orientation" content="portrait">
   <title>Spraff</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%234F46E5'/><text x='50' y='68' text-anchor='middle' font-family='system-ui' font-size='50' font-weight='900' fill='white'>S</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -360,6 +361,33 @@
 
     .status-text.speaking {
       color: var(--secondary);
+    }
+
+    /* Upload progress bar */
+    .upload-progress {
+      position: absolute;
+      bottom: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .upload-progress.visible {
+      opacity: 1;
+    }
+
+    .upload-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.15s ease;
     }
 
     /* Hint text below button */
@@ -1488,9 +1516,66 @@
         font-size: 0.75rem;
       }
     }
+
+    /* Landscape orientation warning for mobile */
+    .landscape-warning {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: var(--bg);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .landscape-warning svg {
+      width: 64px;
+      height: 64px;
+      stroke: var(--accent);
+      stroke-width: 1.5;
+      fill: none;
+      animation: rotatePhone 2s ease-in-out infinite;
+    }
+
+    @keyframes rotatePhone {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-15deg); }
+      75% { transform: rotate(15deg); }
+    }
+
+    .landscape-warning p {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: var(--fg-muted);
+    }
+
+    @media screen and (max-width: 900px) and (orientation: landscape) and (hover: none) and (pointer: coarse) {
+      .landscape-warning {
+        display: flex;
+      }
+
+      .login-screen,
+      .voice-screen {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body>
+  <!-- Landscape Warning -->
+  <div class="landscape-warning">
+    <svg viewBox="0 0 24 24">
+      <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+      <line x1="12" y1="18" x2="12" y2="18.01"/>
+    </svg>
+    <p>Please rotate your device to portrait mode</p>
+  </div>
+
   <!-- Cost Modal -->
   <div class="modal-overlay hidden" id="costModal">
     <div class="modal modal-small">
@@ -1511,6 +1596,10 @@
           <div class="cost-stat">
             <span class="cost-stat-label">This session</span>
             <span class="cost-stat-value" id="costSession">$0.00</span>
+          </div>
+          <div class="cost-stat" id="voiceSizeStat" style="display: none;">
+            <span class="cost-stat-label">Last voice message</span>
+            <span class="cost-stat-value" id="costVoiceSize">—</span>
           </div>
         </div>
       </div>
@@ -1658,6 +1747,9 @@
         <div class="spinner-icon"></div>
       </button>
       <div class="status-text" id="statusText">Ready</div>
+      <div class="upload-progress" id="uploadProgress">
+        <div class="upload-progress-bar" id="uploadProgressBar"></div>
+      </div>
     </div>
 
     <!-- Hint -->
@@ -1771,10 +1863,77 @@
     const MODEL_ONLINE = 'google/gemini-3-flash-preview:online';
     const CALLBACK_URL = window.location.origin + window.location.pathname;
 
+    // ============ Conversation Persistence ============
+    function loadConversationHistory() {
+      try {
+        const saved = localStorage.getItem('conversationHistory');
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        console.warn('Failed to load conversation history:', e);
+        return [];
+      }
+    }
+
+    function saveConversationHistory() {
+      try {
+        localStorage.setItem('conversationHistory', JSON.stringify(conversationHistory));
+      } catch (e) {
+        console.warn('Failed to save conversation history:', e);
+      }
+    }
+
+    function clearConversationHistory() {
+      conversationHistory = [];
+      try {
+        localStorage.removeItem('conversationHistory');
+      } catch (e) {
+        console.warn('Failed to clear conversation history:', e);
+      }
+    }
+
+    // ============ Pending Voice Message Persistence ============
+    function savePendingVoiceMessage(base64Audio) {
+      try {
+        localStorage.setItem('pendingVoiceMessage', base64Audio);
+        localStorage.setItem('pendingVoiceTimestamp', Date.now().toString());
+      } catch (e) {
+        console.warn('Failed to save pending voice message:', e);
+      }
+    }
+
+    function clearPendingVoiceMessage() {
+      try {
+        localStorage.removeItem('pendingVoiceMessage');
+        localStorage.removeItem('pendingVoiceTimestamp');
+      } catch (e) {
+        console.warn('Failed to clear pending voice message:', e);
+      }
+    }
+
+    function getPendingVoiceMessage() {
+      try {
+        const audio = localStorage.getItem('pendingVoiceMessage');
+        const timestamp = localStorage.getItem('pendingVoiceTimestamp');
+        if (audio && timestamp) {
+          // Only return if less than 1 hour old
+          const age = Date.now() - parseInt(timestamp, 10);
+          if (age < 60 * 60 * 1000) {
+            return audio;
+          } else {
+            clearPendingVoiceMessage();
+          }
+        }
+        return null;
+      } catch (e) {
+        console.warn('Failed to get pending voice message:', e);
+        return null;
+      }
+    }
+
     // ============ State ============
     let apiKey = localStorage.getItem('openrouter_api_key');
     let isListening = false;
-    let conversationHistory = [];
+    let conversationHistory = loadConversationHistory();
     let mediaRecorder = null;
     let audioChunks = [];
     let audioStream = null;
@@ -1792,7 +1951,8 @@
     // Stats
     const stats = {
       sessionCost: 0,
-      lastCost: 0
+      lastCost: 0,
+      lastVoiceSize: 0
     };
 
     // ============ DOM Elements ============
@@ -1820,6 +1980,10 @@
     const costBalance = document.getElementById('costBalance');
     const costLast = document.getElementById('costLast');
     const costSession = document.getElementById('costSession');
+    const costVoiceSize = document.getElementById('costVoiceSize');
+    const voiceSizeStat = document.getElementById('voiceSizeStat');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const uploadProgressBar = document.getElementById('uploadProgressBar');
     const aboutModal = document.getElementById('aboutModal');
     const aboutModalClose = document.getElementById('aboutModalClose');
     const aboutBtn = document.getElementById('aboutBtn');
@@ -1854,7 +2018,45 @@
 
       updateSearchToggleUI();
       updateModeUI();
+      updateNewChatButton();
       setupEventListeners();
+      lockOrientation();
+      checkPendingVoiceMessage();
+    }
+
+    // ============ Pending Voice Message Recovery ============
+    async function checkPendingVoiceMessage() {
+      if (!apiKey) return;
+
+      const pendingAudio = getPendingVoiceMessage();
+      if (pendingAudio) {
+        const sizeKB = Math.round(pendingAudio.length * 0.75 / 1024);
+        // Auto-retry the upload
+        setButtonState('processing');
+        statusText.textContent = `Retrying ${sizeKB} KB`;
+
+        try {
+          await sendAudioToAPI(pendingAudio);
+          clearPendingVoiceMessage();
+        } catch (e) {
+          console.error('Failed to retry pending voice message:', e);
+          showError('Failed to send saved voice message');
+          setButtonState('ready');
+        }
+      }
+    }
+
+    // ============ Orientation Lock ============
+    function lockOrientation() {
+      // Only attempt on mobile devices
+      if (!isMobile) return;
+
+      // Try Screen Orientation API (works in some PWA contexts)
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('portrait').catch(() => {
+          // Silently fail - CSS fallback will handle it
+        });
+      }
     }
 
     // ============ OAuth Flow ============
@@ -1921,7 +2123,7 @@
     function logout() {
       apiKey = null;
       localStorage.removeItem('openrouter_api_key');
-      conversationHistory = [];
+      clearConversationHistory();
       showLoginScreen();
     }
 
@@ -1982,6 +2184,25 @@
       stats.sessionCost += cost;
     }
 
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+
+    function showUploadProgress(visible) {
+      if (visible) {
+        uploadProgress.classList.add('visible');
+        uploadProgressBar.style.width = '0%';
+      } else {
+        uploadProgress.classList.remove('visible');
+      }
+    }
+
+    function setUploadProgress(percent) {
+      uploadProgressBar.style.width = Math.min(100, percent) + '%';
+    }
+
     async function openCostModal() {
       settingsDropdown.classList.remove('open');
       costModal.classList.remove('hidden');
@@ -1989,6 +2210,14 @@
       // Update session stats
       costLast.textContent = stats.lastCost > 0 ? `$${stats.lastCost.toFixed(5)}` : '—';
       costSession.textContent = `$${stats.sessionCost.toFixed(5)}`;
+
+      // Show voice size if we have one
+      if (stats.lastVoiceSize > 0) {
+        voiceSizeStat.style.display = '';
+        costVoiceSize.textContent = formatFileSize(stats.lastVoiceSize);
+      } else {
+        voiceSizeStat.style.display = 'none';
+      }
 
       // Fetch balance
       costBalance.textContent = '...';
@@ -2253,10 +2482,12 @@
 
     // ============ New Chat ============
     function startNewChat() {
-      conversationHistory = [];
+      clearConversationHistory();
+      clearPendingVoiceMessage();
       conversationHistoryEl.innerHTML = '';
       stats.sessionCost = 0;
       stats.lastCost = 0;
+      stats.lastVoiceSize = 0;
       updateNewChatButton();
     }
 
@@ -2488,7 +2719,11 @@
           try {
             const wavBlob = await convertToWav(audioBlob);
             const base64Audio = await blobToBase64(wavBlob);
+            // Save before upload in case of page refresh
+            savePendingVoiceMessage(base64Audio);
             await sendAudioToAPI(base64Audio);
+            // Clear on success
+            clearPendingVoiceMessage();
           } catch (e) {
             console.error('Audio conversion error:', e);
             showError('Failed to process audio');
@@ -2622,117 +2857,137 @@ Respond naturally as if having a spoken conversation.`;
       shouldStopSpeaking = false;
       speechQueue = [];
 
+      // Calculate and store voice message size (base64 to bytes: ~75% of base64 length)
+      const audioSizeBytes = Math.round(base64Audio.length * 0.75);
+      stats.lastVoiceSize = audioSizeBytes;
+
+      // Build request body
+      const requestBody = JSON.stringify({
+        model: getModel(),
+        stream: true,
+        messages: [
+          { role: 'system', content: buildSystemPrompt() },
+          ...conversationHistory,
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Listen to this audio and respond.' },
+              { type: 'input_audio', input_audio: { data: base64Audio, format: 'wav' } }
+            ]
+          }
+        ],
+        provider: {
+          only: ['google-vertex'],
+          allow_fallbacks: false,
+          zdr: true
+        }
+      });
+
+      const payloadSize = new Blob([requestBody]).size;
+
+      // Show uploading status for large payloads (>100KB)
+      const isLargeUpload = payloadSize > 100 * 1024;
+      const payloadSizeKB = Math.round(payloadSize / 1024);
+      if (isLargeUpload) {
+        statusText.textContent = `Uploading ${payloadSizeKB} KB`;
+        showUploadProgress(true);
+      }
+
       try {
-        const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': window.location.origin,
-            'X-Title': 'Spraff'
-          },
-          body: JSON.stringify({
-            model: getModel(),
-            stream: true,
-            messages: [
-              { role: 'system', content: buildSystemPrompt() },
-              ...conversationHistory,
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: 'Listen to this audio and respond.' },
-                  { type: 'input_audio', input_audio: { data: base64Audio, format: 'wav' } }
-                ]
+        // Use XHR for upload progress tracking, then process streaming response
+        const response = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `${OPENROUTER_API_URL}/chat/completions`);
+          xhr.setRequestHeader('Authorization', `Bearer ${apiKey}`);
+          xhr.setRequestHeader('Content-Type', 'application/json');
+          xhr.setRequestHeader('HTTP-Referer', window.location.origin);
+          xhr.setRequestHeader('X-Title', 'Spraff');
+
+          // Track real upload progress
+          if (isLargeUpload) {
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable) {
+                const percent = (e.loaded / e.total) * 100;
+                setUploadProgress(percent);
               }
-            ],
-            provider: {
-              only: ['google-vertex'],
-              allow_fallbacks: false,
-              zdr: true
+            };
+
+            xhr.upload.onload = () => {
+              setUploadProgress(100);
+              statusText.textContent = 'Thinking';
+              setTimeout(() => showUploadProgress(false), 300);
+            };
+          }
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(xhr.responseText);
+            } else {
+              try {
+                const error = JSON.parse(xhr.responseText);
+                reject(new Error(error.error?.message || 'API request failed'));
+              } catch {
+                reject(new Error('API request failed'));
+              }
             }
-          })
+          };
+
+          xhr.onerror = () => reject(new Error('Network error'));
+          xhr.send(requestBody);
         });
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error?.message || 'API request failed');
-        }
+        showUploadProgress(false);
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
+        // Parse the SSE response (XHR doesn't stream, so we process all at once)
+        const lines = response.split('\n');
         let fullResponse = '';
-        let sentenceBuffer = '';
-        let buffer = '';
         let usage = null;
         let userTranscript = null;
         let transcriptExtracted = false;
 
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+
+          const data = trimmedLine.slice(6);
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.usage) usage = parsed.usage;
+
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) {
+              fullResponse += content;
+
+              // Extract user transcript
+              if (!transcriptExtracted) {
+                const match = fullResponse.match(/\[USER\]\s*([\s\S]*?)\s*\[\/USER\]/);
+                if (match) {
+                  userTranscript = match[1].trim();
+                  transcriptExtracted = true;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        // Now speak the response
         setButtonState('speaking');
         searchToggle.classList.add('hidden');
         stopBtn.classList.remove('hidden');
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
-
-            const data = trimmedLine.slice(6);
-            if (data === '[DONE]') continue;
-
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.usage) usage = parsed.usage;
-
-              const content = parsed.choices?.[0]?.delta?.content;
-              if (content) {
-                fullResponse += content;
-
-                // Extract user transcript
-                if (!transcriptExtracted) {
-                  const match = fullResponse.match(/\[USER\]\s*([\s\S]*?)\s*\[\/USER\]/);
-                  if (match) {
-                    userTranscript = match[1].trim();
-                    transcriptExtracted = true;
-                  }
-                }
-
-                // Queue speech for response (after transcript extraction)
-                if (transcriptExtracted) {
-                  const endTagIndex = fullResponse.indexOf('[/USER]');
-                  if (endTagIndex !== -1) {
-                    const responseOnly = fullResponse.slice(endTagIndex + 7);
-                    const prevResponse = fullResponse.slice(0, -content.length);
-                    const prevEndIdx = prevResponse.indexOf('[/USER]');
-                    const prevResponseOnly = prevEndIdx !== -1 ? prevResponse.slice(prevEndIdx + 7) : '';
-
-                    if (responseOnly.length > prevResponseOnly.length) {
-                      sentenceBuffer += responseOnly.slice(prevResponseOnly.length);
-                    }
-                  }
-                }
-
-                // Speak complete sentences
-                const sentenceMatch = sentenceBuffer.match(/^(.*?[.!?])\s*/);
-                if (sentenceMatch) {
-                  const sentence = sentenceMatch[1];
-                  sentenceBuffer = sentenceBuffer.slice(sentenceMatch[0].length);
-                  queueSpeech(sentence);
-                }
-              }
-            } catch (e) {}
-          }
+        // Get the response text (after transcript)
+        let responseOnly = fullResponse;
+        const endTagIndex = fullResponse.indexOf('[/USER]');
+        if (endTagIndex !== -1) {
+          responseOnly = fullResponse.slice(endTagIndex + 7).trim();
         }
 
-        // Speak remaining text
-        if (sentenceBuffer.trim()) {
-          queueSpeech(sentenceBuffer.trim());
+        // Queue speech for the entire response, sentence by sentence
+        const sentences = responseOnly.match(/[^.!?]+[.!?]+/g) || [responseOnly];
+        for (const sentence of sentences) {
+          queueSpeech(sentence.trim());
         }
 
         // Update stats from API response
@@ -2740,20 +2995,16 @@ Respond naturally as if having a spoken conversation.`;
           updateSessionCost(usage.cost);
         }
 
-        // Clean response for history
-        let responseOnly = fullResponse;
-        const endTagIndex = fullResponse.indexOf('[/USER]');
-        if (endTagIndex !== -1) {
-          responseOnly = fullResponse.slice(endTagIndex + 7).trim();
-        }
         const cleanResponse = stripSpeechHints(responseOnly);
 
         // Save to conversation history
         conversationHistory.push({ role: 'user', content: userTranscript || '[voice message]' });
         conversationHistory.push({ role: 'assistant', content: cleanResponse });
+        saveConversationHistory();
         updateNewChatButton();
 
       } catch (error) {
+        showUploadProgress(false);
         console.error('API error:', error);
         showError(error.message);
         setButtonState('ready');
@@ -2871,6 +3122,7 @@ Be concise and direct in your responses. Focus on being helpful and informative.
         // Save to conversation history
         conversationHistory.push({ role: 'user', content: userText });
         conversationHistory.push({ role: 'assistant', content: fullResponse });
+        saveConversationHistory();
         updateNewChatButton();
 
       } catch (error) {

@@ -26,7 +26,7 @@ Host it yourself or use it here: [https://martinpllu.github.io/spraff](https://m
 
 There's no backend - it's just a static HTML file. Your conversations go through [OpenRouter](https://openrouter.ai) to Gemini 3 Flash on Google Vertex with [Zero Data Retention](https://openrouter.ai/docs/guides/features/zdr) enabled:
 
-- **This app**: No backend, no data collection
+- **This app**: No backend, no data collection. Your current conversation and any pending voice upload are stored in your browser's local storage so they persist if you switch apps or refresh. This data is cleared when you log out or start a new chat.
 - **OpenRouter**: No conversation content stored, just metadata (timestamps, usage)
 - **Google Vertex**: Zero Data Retention - prompts and responses aren't stored or logged
 
