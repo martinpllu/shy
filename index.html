@@ -1637,16 +1637,14 @@
         <button class="modal-close" id="privacyModalClose">&times;</button>
       </div>
       <div class="modal-body" style="line-height: 1.7;">
-        <p style="margin-bottom: 1rem;"><strong>Spraff stores nothing.</strong></p>
-        <p style="margin-bottom: 1rem;">This app has no backend. It's a static HTML file that runs entirely in your browser. Your conversations are not stored, logged, or transmitted anywhere except to the AI model provider.</p>
+        <p style="margin-bottom: 1rem;">There's no backend — it's just a static HTML file. Your conversations go through <a href="https://openrouter.ai" target="_blank" style="color: var(--accent);">OpenRouter</a> to Gemini on Google Vertex with <a href="https://openrouter.ai/docs/guides/features/zdr" target="_blank" style="color: var(--accent);">Zero Data Retention</a> enabled.</p>
         <p style="margin-bottom: 1rem;"><strong>How your data flows:</strong></p>
         <ul style="margin-bottom: 1rem; padding-left: 1.5rem;">
-          <li style="margin-bottom: 0.5rem;"><strong>This app</strong> — No data collection. No analytics. No cookies (except your OpenRouter API key in localStorage).</li>
-          <li style="margin-bottom: 0.5rem;"><strong>OpenRouter</strong> — Routes your request to the AI model. With Zero Data Retention models, no conversation content is stored—only metadata (timestamps, token counts).</li>
-          <li style="margin-bottom: 0.5rem;"><strong>Google Vertex (Gemini)</strong> — Processes your request with Zero Data Retention enabled. Prompts and responses are not stored or used for training.</li>
+          <li style="margin-bottom: 0.5rem;"><strong>This app</strong> — No backend, no data collection. Your current conversation and any pending voice upload are stored in your browser's local storage so they persist if you switch apps or refresh. This data is cleared when you log out or start a new chat.</li>
+          <li style="margin-bottom: 0.5rem;"><strong>OpenRouter</strong> — No conversation content stored, just metadata (timestamps, usage).</li>
+          <li style="margin-bottom: 0.5rem;"><strong>Google Vertex</strong> — Zero Data Retention — prompts and responses aren't stored or logged.</li>
         </ul>
-        <p style="margin-bottom: 1rem;">When you close the browser tab, your conversation is gone. There's no history, no transcripts, no way to recover what was said.</p>
-        <p style="color: var(--fg-muted);">Your OpenRouter API key is stored in your browser's localStorage so you don't have to log in every time. You can clear it by logging out.</p>
+        <p style="color: var(--fg-muted);">Your OpenRouter API key is also stored in local storage so you don't have to log in every time. You can clear all local data by logging out.</p>
       </div>
     </div>
   </div>
@@ -3412,7 +3410,7 @@ Be concise and direct in your responses. Focus on being helpful and informative.
     // Get the default voice using the same logic as processQueue
     function getDefaultVoice(voices) {
       const preferredLocal = [
-        'Samantha (Enhanced)', 'Ava (Premium)', 'Zoe (Premium)', 'Tom (Enhanced)',
+        'Ava (Premium)', 'Ava', 'Samantha (Enhanced)', 'Zoe (Premium)', 'Tom (Enhanced)',
         'Serena (Premium)', 'Daniel (Enhanced)', 'Karen (Enhanced)', 'Alex',
         'Samantha', 'Daniel', 'Karen', 'Moira', 'Tessa'
       ];
