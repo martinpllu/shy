@@ -24,7 +24,7 @@ Host it yourself or use it here: [https://martinpllu.github.io/spraff](https://m
 
 ## Privacy
 
-There's no backend - it's just a static HTML file. Your conversations go through [OpenRouter](https://openrouter.ai) to Gemini 3 Flash on Google Vertex with [Zero Data Retention](https://openrouter.ai/docs/guides/features/zdr) enabled:
+There's no backend - it's a static site with no server-side code. Your conversations go through [OpenRouter](https://openrouter.ai) to Gemini 3 Flash on Google Vertex with [Zero Data Retention](https://openrouter.ai/docs/guides/features/zdr) enabled:
 
 - **This app**: No backend, no data collection. Your current conversation and any pending voice upload are stored in your browser's local storage so they persist if you switch apps or refresh. This data is cleared when you log out or start a new chat.
 - **OpenRouter**: No conversation content stored, just metadata (timestamps, usage)
@@ -73,7 +73,7 @@ If other models add audio support with ZDR in the future, Spraff may offer model
 
 ## Self-Hosting
 
-It's one HTML file. Download `index.html` and serve it however you like.
+It's a static site with no build step. Download the files and serve them however you like.
 
 ## Running locally
 
