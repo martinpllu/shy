@@ -32,7 +32,11 @@ There's no backend - it's just a static HTML file. Your conversations go through
 
 ## Cost
 
-Most conversations cost a fraction of a cent ([model pricing](https://openrouter.ai/google/gemini-3-flash-preview)), though requests with web search cost a couple of cents each ([web search pricing](https://openrouter.ai/docs/guides/features/plugins/web-search)).
+Most conversations cost a fraction of a cent ([model pricing](https://openrouter.ai/google/gemini-3-flash-preview)). Web searches cost about 2.5 cents each ([web search pricing](https://openrouter.ai/docs/guides/features/plugins/web-search)).
+
+## Web Search
+
+Spraff automatically searches the web when your question requires current information - news, weather, stock prices, sports scores, or recent events. The model decides when a search is needed, erring on the side of caution given the higher cost.
 
 ## Voice Input
 

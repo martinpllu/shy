@@ -481,20 +481,6 @@
       display: none;
     }
 
-    /* Search pill - show on/off state clearly */
-    .search-pill .status-indicator {
-      font-size: 0.75rem;
-      opacity: 0.8;
-    }
-
-    .search-pill.active .status-indicator {
-      opacity: 1;
-    }
-
-    .search-pill .search-label-short {
-      display: none;
-    }
-
     /* Stop button special styling */
     .stop-pill {
       border-color: var(--secondary);
@@ -1507,14 +1493,6 @@
         font-size: 1rem;
       }
 
-      .search-pill .search-label-long {
-        display: none;
-      }
-
-      .search-pill .search-label-short {
-        display: inline;
-      }
-
       .control-pill {
         padding: 0.6rem 0.9rem;
         font-size: 0.75rem;
@@ -1836,15 +1814,6 @@
         </button>
       </div>
 
-      <button class="control-pill search-pill" id="searchToggle">
-        <svg viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="8"/>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <span class="search-label-long">Web Search</span>
-        <span class="search-label-short">Search</span>
-        <span class="status-indicator" id="searchStatus">off</span>
-      </button>
       <button class="control-pill stop-pill hidden" id="stopBtn">
         <svg viewBox="0 0 24 24">
           <rect x="6" y="6" width="12" height="12" rx="1"/>
@@ -1940,7 +1909,6 @@
     let audioChunks = [];
     let audioStream = null;
     let selectedVoiceName = localStorage.getItem('selectedVoice') || null;
-    let webSearchEnabled = false; // Always default to off on page load
     let cloudVoicesEnabled = localStorage.getItem('cloudVoicesEnabled') === 'true';
     let speechQueue = [];
     let isSpeaking = false;
@@ -1972,8 +1940,6 @@
     const settingsMenuBtn = document.getElementById('settingsMenuBtn');
     const settingsDropdown = document.getElementById('settingsDropdown');
     const voiceSettingsBtn = document.getElementById('voiceSettingsBtn');
-    const searchToggle = document.getElementById('searchToggle');
-    const searchStatus = document.getElementById('searchStatus');
     const stopBtn = document.getElementById('stopBtn');
     const voiceModal = document.getElementById('voiceModal');
     const modalClose = document.getElementById('modalClose');
@@ -2021,7 +1987,6 @@
         showLoginScreen();
       }
 
-      updateSearchToggleUI();
       updateModeUI();
       updateNewChatButton();
       setupEventListeners();
@@ -2115,7 +2080,6 @@
         sessionStorage.removeItem('code_verifier');
         window.history.replaceState({}, document.title, window.location.pathname);
         showVoiceScreen();
-        updateSearchToggleUI();
         updateModeUI();
         setupEventListeners();
       } catch (error) {
@@ -2177,11 +2141,6 @@
       errorToast.textContent = message;
       errorToast.classList.add('visible');
       setTimeout(() => errorToast.classList.remove('visible'), 4000);
-    }
-
-    function updateSearchToggleUI() {
-      searchToggle.classList.toggle('active', webSearchEnabled);
-      searchStatus.textContent = webSearchEnabled ? 'on' : 'off';
     }
 
     function updateSessionCost(cost) {
@@ -2758,7 +2717,6 @@
         mediaRecorder.start();
         isListening = true;
         setButtonState('listening');
-        searchToggle.classList.add('hidden');
 
       } catch (error) {
         console.error('Microphone error:', error);
@@ -2868,9 +2826,167 @@
       }
     }
 
+    // ============ Tool Calling ============
+    function parseToolCall(response) {
+      // Look for ```tool_call\n{...}\n``` pattern
+      const match = response.match(/```tool_call\s*\n([\s\S]*?)\n```/);
+      if (!match) return null;
+
+      try {
+        const toolCall = JSON.parse(match[1].trim());
+        if (toolCall.tool && typeof toolCall.tool === 'string') {
+          return toolCall;
+        }
+      } catch (e) {
+        console.warn('Failed to parse tool call:', e);
+      }
+      return null;
+    }
+
+    async function executeWebSearchText(userText, systemPrompt) {
+      // Make a request with the :online model for web search
+      const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'Spraff'
+        },
+        body: JSON.stringify({
+          model: MODEL_ONLINE,
+          stream: true,
+          messages: [
+            { role: 'system', content: systemPrompt + '\n\nWeb search is ENABLED for this query. You have access to current information from the web. Provide a helpful response using the search results.' },
+            ...conversationHistory,
+            { role: 'user', content: userText }
+          ],
+          provider: {
+            only: ['google-vertex'],
+            allow_fallbacks: false,
+            zdr: true
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'API request failed');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = '';
+      let buffer = '';
+      let usage = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+
+          const data = trimmedLine.slice(6);
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.usage) usage = parsed.usage;
+
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) {
+              fullResponse += content;
+              updateStreamingMessage(fullResponse);
+            }
+          } catch (e) {}
+        }
+      }
+
+      return { fullResponse, usage };
+    }
+
+    async function executeWebSearchVoice(base64Audio, systemPrompt) {
+      // Build request body with :online model
+      const requestBody = JSON.stringify({
+        model: MODEL_ONLINE,
+        stream: true,
+        messages: [
+          { role: 'system', content: systemPrompt + '\n\nWeb search is ENABLED for this query. You have access to current information from the web. Provide a helpful response using the search results.' },
+          ...conversationHistory,
+          {
+            role: 'user',
+            content: [
+              { type: 'input_audio', input_audio: { data: base64Audio, format: 'wav' } }
+            ]
+          }
+        ],
+        provider: {
+          only: ['google-vertex'],
+          allow_fallbacks: false,
+          zdr: true
+        }
+      });
+
+      const response = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${OPENROUTER_API_URL}/chat/completions`);
+        xhr.setRequestHeader('Authorization', `Bearer ${apiKey}`);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('HTTP-Referer', window.location.origin);
+        xhr.setRequestHeader('X-Title', 'Spraff');
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(xhr.responseText);
+          } else {
+            try {
+              const error = JSON.parse(xhr.responseText);
+              reject(new Error(error.error?.message || 'API request failed'));
+            } catch {
+              reject(new Error('API request failed'));
+            }
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(requestBody);
+      });
+
+      // Parse the SSE response
+      const lines = response.split('\n');
+      let fullResponse = '';
+      let usage = null;
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+
+        const data = trimmedLine.slice(6);
+        if (data === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.usage) usage = parsed.usage;
+
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) {
+            fullResponse += content;
+          }
+        } catch (e) {}
+      }
+
+      return { fullResponse, usage };
+    }
+
     // ============ API Communication ============
     function getModel() {
-      return webSearchEnabled ? MODEL_ONLINE : MODEL;
+      return MODEL;
     }
 
     function buildSystemPrompt() {
@@ -2881,22 +2997,15 @@
         day: 'numeric'
       });
 
-      const searchButtonName = window.innerWidth <= 480 ? 'Search' : 'Web Search';
-      const webSearchNote = webSearchEnabled
-        ? 'Web search is ENABLED for this query. You have access to current information from the web.'
-        : `Web search is currently DISABLED for this query. If the user asks about recent events, current news, weather, sports scores, stock prices, or anything that requires up-to-date information, DO NOT attempt to answer from your training data. Instead, give a brief response like: "I'll need web search enabled for current news. Tap the ${searchButtonName} button and ask me again." Keep it short and direct.`;
-
       return `You are a helpful assistant that can communicate via voice or text. Today is ${today}.
 
 The user is currently in VOICE MODE - they spoke this message aloud and your response will be read aloud via text-to-speech. Previous messages in the conversation may have been via text or voice.
-
-${webSearchNote}
 
 NOTE: The technical details in this system prompt (about voice mode, text-to-speech, etc.) are about HOW to format your response, not WHAT to talk about. Answer the user's actual question - don't let these instructions bias your content toward tech topics.
 
 CRITICAL REQUIREMENTS:
 
-1. TRANSCRIPTION: You MUST start your response by transcribing exactly what the user said in their audio message using [USER]...[/USER] tags. Listen carefully to their audio and write what they said:
+1. TRANSCRIPTION: You MUST ALWAYS start your response by transcribing exactly what the user said in their audio message using [USER]...[/USER] tags. Listen carefully to their audio and write what they said:
 
 [USER]
 <transcribe the user's spoken words here>
@@ -2910,6 +3019,14 @@ CRITICAL REQUIREMENTS:
 - NEVER use domain names like ".com", ".io", ".net", etc.
 - Avoid all technical formatting, code, or special characters
 - No lists or bullet points - use flowing sentences instead
+
+3. TOOLS: You have access to a web_search tool. To use it, include the following AFTER your [USER] transcript:
+
+\`\`\`tool_call
+{"tool": "web_search"}
+\`\`\`
+
+ONLY use web_search when you are CERTAIN the user needs current, real-time information (news, weather, stock prices, sports scores, recent events). Do NOT use it for general knowledge. If unsure, just ask if they'd like you to search.
 
 Respond naturally as if having a spoken conversation.`;
     }
@@ -3033,11 +3150,6 @@ Respond naturally as if having a spoken conversation.`;
           } catch (e) {}
         }
 
-        // Now speak the response
-        setButtonState('speaking');
-        searchToggle.classList.add('hidden');
-        stopBtn.classList.remove('hidden');
-
         // Get the response text (after transcript)
         let responseOnly = fullResponse;
         const endTagIndex = fullResponse.indexOf('[/USER]');
@@ -3045,31 +3157,128 @@ Respond naturally as if having a spoken conversation.`;
           responseOnly = fullResponse.slice(endTagIndex + 7).trim();
         }
 
-        // Queue speech for the entire response, sentence by sentence
-        const sentences = responseOnly.match(/[^.!?]+[.!?]+/g) || [responseOnly];
-        for (let i = 0; i < sentences.length; i++) {
-          queueSpeech(sentences[i].trim(), i === 0);
-        }
+        // Check for tool calls
+        const toolCall = parseToolCall(responseOnly);
+        // Also check the full response in case the tool call came without transcript tags
+        const toolCallFromFull = !toolCall ? parseToolCall(fullResponse) : null;
+        const detectedToolCall = toolCall || toolCallFromFull;
 
-        // Update stats from API response
-        if (usage && typeof usage.cost === 'number') {
-          updateSessionCost(usage.cost);
-        }
+        if (detectedToolCall && detectedToolCall.tool === 'web_search') {
+          // If we don't have a transcript, we can't proceed with search in voice mode
+          if (!userTranscript) {
+            console.warn('Web search requested but no transcript available');
+            showError('Could not process voice search request');
+            setButtonState('ready');
+            stopBtn.classList.add('hidden');
+            return;
+          }
 
-        // Save to conversation history (keep speech hints for display)
-        conversationHistory.push({ role: 'user', content: userTranscript || '[voice message]' });
-        conversationHistory.push({ role: 'assistant', content: responseOnly });
-        saveConversationHistory();
-        updateNewChatButton();
+          // Show searching status and speak it
+          statusText.textContent = 'Searching';
+          setButtonState('speaking');
+
+          // Speak the searching message and wait for it to finish
+          await new Promise((resolve) => {
+            const utterance = new SpeechSynthesisUtterance('Searching the web, please wait.');
+            utterance.rate = 1.1;
+            // Use the selected voice if available
+            if (selectedVoiceName) {
+              const voices = speechSynthesis.getVoices();
+              const voice = voices.find(v => v.name === selectedVoiceName);
+              if (voice) utterance.voice = voice;
+            }
+            utterance.onend = resolve;
+            utterance.onerror = resolve;
+            speechSynthesis.speak(utterance);
+          });
+
+          try {
+            // Execute web search with the transcript as text (not audio)
+            // Use a simplified voice-friendly system prompt without transcript tags
+            const searchResult = await executeWebSearchText(userTranscript, buildVoiceSearchSystemPrompt());
+
+            // Update stats (include both requests)
+            if (usage && typeof usage.cost === 'number') {
+              updateSessionCost(usage.cost);
+            }
+            if (searchResult.usage && typeof searchResult.usage.cost === 'number') {
+              updateSessionCost(searchResult.usage.cost);
+            }
+
+            // Now speak the search response
+            setButtonState('speaking');
+            stopBtn.classList.remove('hidden');
+
+            const sentences = searchResult.fullResponse.match(/[^.!?]+[.!?]+/g) || [searchResult.fullResponse];
+            for (let i = 0; i < sentences.length; i++) {
+              queueSpeech(sentences[i].trim(), i === 0);
+            }
+
+            // Save to conversation history
+            conversationHistory.push({ role: 'user', content: userTranscript });
+            conversationHistory.push({ role: 'assistant', content: searchResult.fullResponse });
+            saveConversationHistory();
+            updateNewChatButton();
+          } catch (searchError) {
+            console.error('Web search error:', searchError);
+            showError('Web search failed: ' + searchError.message);
+            setButtonState('ready');
+            stopBtn.classList.add('hidden');
+          }
+        } else {
+          // Normal response - speak it
+          setButtonState('speaking');
+          stopBtn.classList.remove('hidden');
+
+          // Queue speech for the entire response, sentence by sentence
+          const sentences = responseOnly.match(/[^.!?]+[.!?]+/g) || [responseOnly];
+          for (let i = 0; i < sentences.length; i++) {
+            queueSpeech(sentences[i].trim(), i === 0);
+          }
+
+          // Update stats from API response
+          if (usage && typeof usage.cost === 'number') {
+            updateSessionCost(usage.cost);
+          }
+
+          // Save to conversation history (keep speech hints for display)
+          conversationHistory.push({ role: 'user', content: userTranscript || '[voice message]' });
+          conversationHistory.push({ role: 'assistant', content: responseOnly });
+          saveConversationHistory();
+          updateNewChatButton();
+        }
 
       } catch (error) {
         showUploadProgress(false);
         console.error('API error:', error);
         showError(error.message);
         setButtonState('ready');
-        searchToggle.classList.remove('hidden');
         stopBtn.classList.add('hidden');
       }
+    }
+
+    function buildVoiceSearchSystemPrompt() {
+      const today = new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      return `You are a helpful assistant. Today is ${today}.
+
+Your response will be read aloud via text-to-speech.
+
+Web search is ENABLED for this query. You have access to current information from the web. Provide a helpful response using the search results.
+
+SPEECH-FRIENDLY OUTPUT: Your response will be converted to speech, so you MUST:
+- Be concise and conversational
+- NEVER include URLs or links - they sound terrible spoken aloud. Describe sources naturally, e.g. "according to Simon Willison's blog" not "according to simonwillison.net"
+- NEVER use domain names like ".com", ".io", ".net", etc.
+- Avoid all technical formatting, code, or special characters
+- No lists or bullet points - use flowing sentences instead
+
+Respond naturally as if having a spoken conversation.`;
     }
 
     function buildTextSystemPrompt() {
@@ -3080,16 +3289,32 @@ Respond naturally as if having a spoken conversation.`;
         day: 'numeric'
       });
 
-      const searchButtonName = window.innerWidth <= 480 ? 'Search' : 'Web Search';
-      const webSearchNote = webSearchEnabled
-        ? 'Web search is ENABLED for this query. You have access to current information from the web.'
-        : `Web search is currently DISABLED for this query. If the user asks about recent events, current news, weather, sports scores, stock prices, or anything that requires up-to-date information, DO NOT attempt to answer from your training data. Instead, briefly tell them to enable the "${searchButtonName}" toggle and ask again.`;
-
       return `You are a helpful assistant that can communicate via voice or text. Today is ${today}.
 
 The user is currently in TEXT MODE - they typed this message and will read your response on screen. Previous messages in the conversation may have been via text or voice.
 
-${webSearchNote}
+## Tools
+
+You have access to tools that run in the user's browser. To use a tool, respond with ONLY a JSON code block in this format:
+
+\`\`\`tool_call
+{"tool": "tool_name", "args": {...}}
+\`\`\`
+
+When you use a tool, do not include any other text in your response - just the tool call block.
+
+### Available Tools
+
+**web_search**
+- Description: Routes the user's query to a search-enabled model that can access current information from the web.
+- Arguments: none
+- When to use: ONLY use this tool when you are CERTAIN the user needs current, real-time information that you cannot provide from your training data. Examples:
+  - User explicitly asks to search: "search for...", "look up...", "find me..."
+  - Current events: "what's in the news today", "latest on..."
+  - Real-time data: weather, stock prices, sports scores, election results
+  - Recent releases: "what's the newest iPhone", "latest software version"
+- When NOT to use: Do NOT use for general knowledge questions, historical facts, explanations, coding help, or anything you can answer from your training data. Web searches are expensive (2.5 cents each vs fractions of a cent for regular queries), so use them conservatively.
+- If unsure: Ask the user "Would you like me to search the web for that?" rather than automatically searching.
 
 Because this response will be read on screen, you can use:
 - Markdown formatting (bold, lists, code blocks) when helpful
@@ -3113,7 +3338,6 @@ Be concise and direct in your responses. Focus on being helpful and informative.
       textSendBtn.classList.add('loading');
       textInput.disabled = true;
       stopBtn.classList.remove('hidden');
-      searchToggle.classList.add('hidden');
 
       // Add user message to UI
       addMessageToHistory('user', userText);
@@ -3179,24 +3403,61 @@ Be concise and direct in your responses. Focus on being helpful and informative.
               const content = parsed.choices?.[0]?.delta?.content;
               if (content) {
                 fullResponse += content;
-                updateStreamingMessage(fullResponse);
+                // Check if this looks like a tool call starting - don't display it
+                if (!fullResponse.includes('```tool_call')) {
+                  updateStreamingMessage(fullResponse);
+                } else {
+                  // Show searching message as soon as we detect tool call
+                  updateStreamingMessage('*Searching the web...*');
+                }
               }
             } catch (e) {}
           }
         }
 
-        finishStreamingMessage();
+        // Check for tool calls before finishing
+        const toolCall = parseToolCall(fullResponse);
+        if (toolCall && toolCall.tool === 'web_search') {
+          try {
+            // Execute web search with :online model
+            const searchResult = await executeWebSearchText(userText, buildTextSystemPrompt());
 
-        // Update stats
-        if (usage && typeof usage.cost === 'number') {
-          updateSessionCost(usage.cost);
+            // Update the streaming message with search results
+            updateStreamingMessage(searchResult.fullResponse);
+            finishStreamingMessage();
+
+            // Update stats (include both requests)
+            if (usage && typeof usage.cost === 'number') {
+              updateSessionCost(usage.cost);
+            }
+            if (searchResult.usage && typeof searchResult.usage.cost === 'number') {
+              updateSessionCost(searchResult.usage.cost);
+            }
+
+            // Save to conversation history (only save the final search result, not the tool call)
+            conversationHistory.push({ role: 'user', content: userText });
+            conversationHistory.push({ role: 'assistant', content: searchResult.fullResponse });
+            saveConversationHistory();
+            updateNewChatButton();
+          } catch (searchError) {
+            console.error('Web search error:', searchError);
+            showError('Web search failed: ' + searchError.message);
+            finishStreamingMessage();
+          }
+        } else {
+          finishStreamingMessage();
+
+          // Update stats
+          if (usage && typeof usage.cost === 'number') {
+            updateSessionCost(usage.cost);
+          }
+
+          // Save to conversation history
+          conversationHistory.push({ role: 'user', content: userText });
+          conversationHistory.push({ role: 'assistant', content: fullResponse });
+          saveConversationHistory();
+          updateNewChatButton();
         }
-
-        // Save to conversation history
-        conversationHistory.push({ role: 'user', content: userText });
-        conversationHistory.push({ role: 'assistant', content: fullResponse });
-        saveConversationHistory();
-        updateNewChatButton();
 
       } catch (error) {
         console.error('API error:', error);
@@ -3219,13 +3480,6 @@ Be concise and direct in your responses. Focus on being helpful and informative.
           textInput.focus();
         }
         stopBtn.classList.add('hidden');
-        searchToggle.classList.remove('hidden');
-        // Reset web search after each response
-        if (webSearchEnabled) {
-          webSearchEnabled = false;
-          localStorage.setItem('webSearchEnabled', 'false');
-          updateSearchToggleUI();
-        }
       }
     }
 
@@ -3271,7 +3525,6 @@ Be concise and direct in your responses. Focus on being helpful and informative.
         if (speechQueue.length === 0) {
           showSpeechProgress(false);
           setButtonState('ready');
-          searchToggle.classList.remove('hidden');
           stopBtn.classList.add('hidden');
         }
         return;
@@ -3367,7 +3620,6 @@ Be concise and direct in your responses. Focus on being helpful and informative.
       isSpeaking = false;
       showSpeechProgress(false);
       setButtonState('ready');
-      searchToggle.classList.remove('hidden');
       stopBtn.classList.add('hidden');
     }
 
@@ -3680,13 +3932,6 @@ Be concise and direct in your responses. Focus on being helpful and informative.
       });
       privacyModal.addEventListener('click', (e) => {
         if (e.target === privacyModal) privacyModal.classList.add('hidden');
-      });
-
-      // Search toggle
-      searchToggle.addEventListener('click', () => {
-        webSearchEnabled = !webSearchEnabled;
-        localStorage.setItem('webSearchEnabled', webSearchEnabled);
-        updateSearchToggleUI();
       });
 
       // Stop button
