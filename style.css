@@ -233,6 +233,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.voice-screen.text-mode .button-container {
+  opacity: 0;
+  transform: translateX(-30%);
+  pointer-events: none;
 }
 
 .main-button {
@@ -1046,13 +1053,15 @@ body {
   z-index: 1;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.3s ease, visibility 0.3s ease;
+  transform: translateX(30%);
+  transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
   -webkit-overflow-scrolling: touch;
 }
 
 .conversation-history.visible {
   opacity: 1;
   visibility: visible;
+  transform: translateX(0);
 }
 
 .conversation-history::-webkit-scrollbar {
@@ -1426,12 +1435,9 @@ body {
 }
 
 /* Text mode adjustments */
-.voice-screen.text-mode .button-container {
-  display: none;
-}
-
 .voice-screen.text-mode .hint-text {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Ensure cost and menu float above conversation */

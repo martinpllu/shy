@@ -2231,6 +2231,60 @@ Be concise and direct in your responses. Focus on being helpful and informative.
         window.visualViewport.addEventListener('scroll', adjustForKeyboard);
       }
 
+      // Mobile swipe gestures for mode switching
+      if (isMobile) {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartTime = 0;
+        let swipeTracking = false;
+
+        function handleTouchStart(e) {
+          // Don't interfere with input fields, modals, or settings
+          if (e.target.closest('.text-input-container, .modal, .settings-dropdown')) return;
+
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+          touchStartTime = Date.now();
+          swipeTracking = true;
+        }
+
+        function handleTouchEnd(e) {
+          if (!swipeTracking) return;
+          swipeTracking = false;
+
+          // Don't interfere with input fields, modals, or settings
+          if (e.target.closest('.text-input-container, .modal, .settings-dropdown')) return;
+
+          const touchEndX = e.changedTouches[0].clientX;
+          const touchEndY = e.changedTouches[0].clientY;
+          const deltaX = touchEndX - touchStartX;
+          const deltaY = touchEndY - touchStartY;
+          const elapsed = Date.now() - touchStartTime;
+
+          // Require: horizontal swipe > 80px, much more horizontal than vertical, completed in < 300ms
+          const minSwipeDistance = 80;
+          const maxSwipeTime = 300;
+
+          if (Math.abs(deltaX) > minSwipeDistance &&
+              Math.abs(deltaX) > Math.abs(deltaY) * 2 &&
+              elapsed < maxSwipeTime) {
+            if (deltaX < 0 && !textMode) {
+              // Swipe left → text mode
+              setTextMode(true);
+            } else if (deltaX > 0 && textMode) {
+              // Swipe right → voice mode
+              setTextMode(false);
+            }
+          }
+        }
+
+        // Attach to both voiceScreen and conversationHistory (which is position:fixed overlay)
+        voiceScreen.addEventListener('touchstart', handleTouchStart, { passive: true });
+        voiceScreen.addEventListener('touchend', handleTouchEnd, { passive: true });
+        conversationHistoryEl.addEventListener('touchstart', handleTouchStart, { passive: true });
+        conversationHistoryEl.addEventListener('touchend', handleTouchEnd, { passive: true });
+      }
+
     }
 
     // ============ Start ============
