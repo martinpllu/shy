@@ -363,37 +363,6 @@ body {
   color: var(--secondary);
 }
 
-/* Upload progress bar */
-.upload-progress {
-  position: absolute;
-  bottom: -30px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 120px;
-  height: 4px;
-  background: var(--border);
-  border-radius: 2px;
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.upload-progress.visible {
-  opacity: 1;
-}
-
-.upload-progress-bar {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 2px;
-  width: 0%;
-  transition: width 0.15s ease;
-}
-
-.upload-progress.speaking .upload-progress-bar {
-  background: var(--secondary);
-}
-
 /* Hint text below button */
 .hint-text {
   position: fixed;

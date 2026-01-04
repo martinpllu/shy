@@ -92,7 +92,6 @@
     let shouldStopSpeaking = false;
     let speechTotalChars = 0;
     let speechSpokenChars = 0;
-    let speechProgressInterval = null;
     let textMode = localStorage.getItem('textMode') === 'true';
     let isProcessingText = false;
     const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -131,8 +130,6 @@
     const costSession = document.getElementById('costSession');
     const costVoiceSize = document.getElementById('costVoiceSize');
     const voiceSizeStat = document.getElementById('voiceSizeStat');
-    const uploadProgress = document.getElementById('uploadProgress');
-    const uploadProgressBar = document.getElementById('uploadProgressBar');
     const aboutModal = document.getElementById('aboutModal');
     const aboutModalClose = document.getElementById('aboutModalClose');
     const aboutBtn = document.getElementById('aboutBtn');
@@ -347,38 +344,6 @@
       if (bytes < 1024) return bytes + ' B';
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
       return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-    }
-
-    function showUploadProgress(visible) {
-      if (visible) {
-        uploadProgress.classList.add('visible');
-        uploadProgress.classList.remove('speaking');
-        uploadProgressBar.style.width = '0%';
-      } else {
-        uploadProgress.classList.remove('visible');
-        uploadProgress.classList.remove('speaking');
-      }
-    }
-
-    function setUploadProgress(percent) {
-      uploadProgressBar.style.width = Math.min(100, percent) + '%';
-    }
-
-    function showSpeechProgress(visible) {
-      if (visible) {
-        uploadProgress.classList.add('visible', 'speaking');
-        uploadProgressBar.style.width = '0%';
-      } else {
-        uploadProgress.classList.remove('visible', 'speaking');
-        if (speechProgressInterval) {
-          clearInterval(speechProgressInterval);
-          speechProgressInterval = null;
-        }
-      }
-    }
-
-    function setSpeechProgress(percent) {
-      uploadProgressBar.style.width = Math.min(100, percent) + '%';
     }
 
     async function openCostModal() {
@@ -1133,73 +1098,72 @@
     }
 
     async function executeWebSearchVoice(base64Audio, systemPrompt) {
-      // Build request body with :online model
-      const requestBody = JSON.stringify({
-        model: MODEL_ONLINE,
-        stream: true,
-        messages: [
-          { role: 'system', content: systemPrompt + '\n\nWeb search is ENABLED for this query. You have access to current information from the web. Provide a helpful response using the search results.' },
-          ...conversationHistory,
-          {
-            role: 'user',
-            content: [
-              { type: 'input_audio', input_audio: { data: base64Audio, format: 'wav' } }
-            ]
-          }
-        ],
-        provider: {
-          only: ['google-vertex'],
-          allow_fallbacks: false,
-          zdr: true
-        }
-      });
-
-      const response = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${OPENROUTER_API_URL}/chat/completions`);
-        xhr.setRequestHeader('Authorization', `Bearer ${apiKey}`);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('HTTP-Referer', window.location.origin);
-        xhr.setRequestHeader('X-Title', 'Spraff');
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(xhr.responseText);
-          } else {
-            try {
-              const error = JSON.parse(xhr.responseText);
-              reject(new Error(error.error?.message || 'API request failed'));
-            } catch {
-              reject(new Error('API request failed'));
+      const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'Spraff'
+        },
+        body: JSON.stringify({
+          model: MODEL_ONLINE,
+          stream: true,
+          messages: [
+            { role: 'system', content: systemPrompt + '\n\nWeb search is ENABLED for this query. You have access to current information from the web. Provide a helpful response using the search results.' },
+            ...conversationHistory,
+            {
+              role: 'user',
+              content: [
+                { type: 'input_audio', input_audio: { data: base64Audio, format: 'wav' } }
+              ]
             }
+          ],
+          provider: {
+            only: ['google-vertex'],
+            allow_fallbacks: false,
+            zdr: true
           }
-        };
-
-        xhr.onerror = () => reject(new Error('Network error'));
-        xhr.send(requestBody);
+        })
       });
 
-      // Parse the SSE response
-      const lines = response.split('\n');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'API request failed');
+      }
+
+      // Stream the response
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
       let fullResponse = '';
+      let buffer = '';
       let usage = null;
 
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-        if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-        const data = trimmedLine.slice(6);
-        if (data === '[DONE]') continue;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.usage) usage = parsed.usage;
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
 
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            fullResponse += content;
-          }
-        } catch (e) {}
+          const data = trimmedLine.slice(6);
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.usage) usage = parsed.usage;
+
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) {
+              fullResponse += content;
+            }
+          } catch (e) {}
+        }
       }
 
       return { fullResponse, usage };
@@ -1253,7 +1217,6 @@ Respond naturally as if having a spoken conversation.`;
     }
 
     async function sendAudioToAPI(base64Audio) {
-      const requestStartTime = performance.now();
       shouldStopSpeaking = false;
       speechQueue = [];
 
@@ -1283,92 +1246,73 @@ Respond naturally as if having a spoken conversation.`;
       });
 
       const payloadSize = new Blob([requestBody]).size;
-
-      // Show uploading status for large payloads (>100KB)
-      const isLargeUpload = payloadSize > 100 * 1024;
       const payloadSizeKB = Math.round(payloadSize / 1024);
-      if (isLargeUpload) {
-        statusText.textContent = `Uploading ${payloadSizeKB} KB`;
-        showUploadProgress(true);
-      }
+
+      // Show uploading status
+      statusText.textContent = `Uploading ${payloadSizeKB} KB`;
 
       try {
-        // Use XHR for upload progress tracking, then process streaming response
-        const response = await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', `${OPENROUTER_API_URL}/chat/completions`);
-          xhr.setRequestHeader('Authorization', `Bearer ${apiKey}`);
-          xhr.setRequestHeader('Content-Type', 'application/json');
-          xhr.setRequestHeader('HTTP-Referer', window.location.origin);
-          xhr.setRequestHeader('X-Title', 'Spraff');
-
-          // Track real upload progress
-          if (isLargeUpload) {
-            xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable) {
-                const percent = (e.loaded / e.total) * 100;
-                setUploadProgress(percent);
-              }
-            };
-
-            xhr.upload.onload = () => {
-              setUploadProgress(100);
-              statusText.textContent = 'Thinking';
-              setTimeout(() => showUploadProgress(false), 300);
-            };
-          }
-
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(xhr.responseText);
-            } else {
-              try {
-                const error = JSON.parse(xhr.responseText);
-                reject(new Error(error.error?.message || 'API request failed'));
-              } catch {
-                reject(new Error('API request failed'));
-              }
-            }
-          };
-
-          xhr.onerror = () => reject(new Error('Network error'));
-          xhr.send(requestBody);
+        const response = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'Spraff'
+          },
+          body: requestBody
         });
 
-        showUploadProgress(false);
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'API request failed');
+        }
 
-        // Parse the SSE response (XHR doesn't stream, so we process all at once)
-        const lines = response.split('\n');
+        statusText.textContent = 'Thinking';
+
+        // Stream the response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
         let fullResponse = '';
+        let buffer = '';
         let usage = null;
         let userTranscript = null;
         let transcriptExtracted = false;
 
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-          const data = trimmedLine.slice(6);
-          if (data === '[DONE]') continue;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.usage) usage = parsed.usage;
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
 
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              fullResponse += content;
+            const data = trimmedLine.slice(6);
+            if (data === '[DONE]') continue;
 
-              // Extract user transcript
-              if (!transcriptExtracted) {
-                const match = fullResponse.match(/\[USER\]\s*([\s\S]*?)\s*\[\/USER\]/);
-                if (match) {
-                  userTranscript = match[1].trim();
-                  transcriptExtracted = true;
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.usage) usage = parsed.usage;
+
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                fullResponse += content;
+
+                // Extract user transcript
+                if (!transcriptExtracted) {
+                  const match = fullResponse.match(/\[USER\]\s*([\s\S]*?)\s*\[\/USER\]/);
+                  if (match) {
+                    userTranscript = match[1].trim();
+                    transcriptExtracted = true;
+                  }
                 }
               }
-            }
-          } catch (e) {}
+            } catch (e) {}
+          }
         }
 
         // Get the response text (after transcript)
@@ -1468,7 +1412,6 @@ Respond naturally as if having a spoken conversation.`;
             }
 
       } catch (error) {
-        showUploadProgress(false);
         console.error('API error:', error);
         showError(error.message);
         setButtonState('ready');
@@ -1740,7 +1683,6 @@ Be concise and direct in your responses. Focus on being helpful and informative.
       if (shouldStopSpeaking || speechQueue.length === 0) {
         isSpeaking = false;
         if (speechQueue.length === 0) {
-          showSpeechProgress(false);
           stopBtn.classList.add('hidden');
           setButtonState('ready');
         }
@@ -1750,12 +1692,6 @@ Be concise and direct in your responses. Focus on being helpful and informative.
       isSpeaking = true;
       const text = speechQueue.shift();
       const textLength = text.length;
-
-      // Show speech progress bar
-      if (speechTotalChars > 0) {
-        showSpeechProgress(true);
-        setSpeechProgress((speechSpokenChars / speechTotalChars) * 100);
-      }
 
       if (!window.speechSynthesis) {
         speechSpokenChars += textLength;
@@ -1793,10 +1729,6 @@ Be concise and direct in your responses. Focus on being helpful and informative.
       const markEnded = () => {
         if (ended) return;
         ended = true;
-        if (speechProgressInterval) {
-          clearInterval(speechProgressInterval);
-          speechProgressInterval = null;
-        }
         speechSpokenChars += textLength;
         processQueue();
       };
@@ -1804,20 +1736,8 @@ Be concise and direct in your responses. Focus on being helpful and informative.
       utterance.onend = markEnded;
       utterance.onerror = markEnded;
 
-      // Animate progress during speech using estimated timing
-      const estimatedDuration = Math.max(2000, text.length * 80);
-      const startChars = speechSpokenChars;
-      const speechStartTime = performance.now();
-      speechProgressInterval = setInterval(() => {
-        if (speechTotalChars > 0) {
-          const elapsed = performance.now() - speechStartTime;
-          const charsSpoken = Math.min(textLength, (elapsed / estimatedDuration) * textLength);
-          const totalProgress = ((startChars + charsSpoken) / speechTotalChars) * 100;
-          setSpeechProgress(totalProgress);
-        }
-      }, 50);
-
       // Fallback timeout for iOS
+      const estimatedDuration = Math.max(2000, text.length * 80);
       setTimeout(() => {
         if (!ended && isSpeaking) {
           console.warn('Speech timeout fallback triggered');
@@ -1835,7 +1755,6 @@ Be concise and direct in your responses. Focus on being helpful and informative.
       speechQueue = [];
       speechSynthesis.cancel();
       isSpeaking = false;
-      showSpeechProgress(false);
       setButtonState('ready');
       stopBtn.classList.add('hidden');
     }
